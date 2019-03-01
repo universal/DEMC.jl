@@ -184,3 +184,31 @@ function update_demcz_chain_block(Xcurrent, current_logobj, ib, Zmat, M, logobj,
         return Xcurrent, current_logobj
     end
 end
+
+function snooker_update(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockindex, eps_scale, Nblocks)
+    block = blockindex[ib]
+    blocklen = length(block)
+    Xproposal = copy(Xcurrent)
+    set = collect(1:M)
+    s1 = rand(set) # z
+    deleteat!(set, s1)
+    s2 = rand(set) # r1
+    deleteat!(set, s2)
+    s3 = rand(set) # r2
+    deleteat!(set, s3)
+    z  = Zmat[s1, block]
+    r1 = Zmat[s2, block]
+    r2 = Zmat[s3, block]
+    distanceXZ = Xcurrent[block] - z
+    # project r1 and r2
+    projectR1Z = dot(r1, distanceXZ)
+    projectR2Z = dot(r2, distanceXZ)
+    γSnooker = 1.2 + rand() # uniform [1.2, 2.2]
+    de_diffvec = zeros(length(Xproposal))
+    de_diffvec[block] = γSnooker * (projectR1Z - projectR2Z) / dot(distanceXZ, distanceXZ) * distanceXZ
+
+
+
+    distanceXZ = Xcurrent .-
+
+end
