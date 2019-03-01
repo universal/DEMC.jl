@@ -5,7 +5,8 @@ module DEMC
     using Plots
     using Distributed
     using Statistics
-
+    using LinearAlgebra
+    
     struct MC
         chain::Array{Float64} # parameter population for all generations
         log_obj::Array{Float64} # log obj along the chain

@@ -154,8 +154,17 @@ end
 
 
 function update_blocks(Xcurrent, current_logobj, Zmat, M, logobj, blockindex, eps_scale, γ, Nblocks)
-    for ib in 1:Nblocks
-        Xcurrent[:], current_logobj = update_demcz_chain_block(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockindex, eps_scale, γ, Nblocks)
+    snooker = rand() < 0.1
+    if snooker  # snooker update
+        before = current_logobj
+        for ib in 1:Nblocks
+            Xcurrent[:], current_logobj = snooker_update(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockindex, Nblocks)
+        end
+        println("snooker update", before, current_logobj)
+    else
+        for ib in 1:Nblocks
+            Xcurrent[:], current_logobj = update_demcz_chain_block(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockindex, eps_scale, γ, Nblocks)
+        end
     end
     return Xcurrent, current_logobj
 end
@@ -185,20 +194,23 @@ function update_demcz_chain_block(Xcurrent, current_logobj, ib, Zmat, M, logobj,
     end
 end
 
-function snooker_update(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockindex, eps_scale, Nblocks)
+function sample_without_replacement!(A,n)
+    sample = Array{eltype(A)}(undef, n)
+    for i in 1:n
+        sample[i] = splice!(A, rand(eachindex(A)))
+    end
+    return sample
+end
+
+function snooker_update(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockindex, Nblocks)
     block = blockindex[ib]
     blocklen = length(block)
     Xproposal = copy(Xcurrent)
-    set = collect(1:M)
-    s1 = rand(set) # z
-    deleteat!(set, s1)
-    s2 = rand(set) # r1
-    deleteat!(set, s2)
-    s3 = rand(set) # r2
-    deleteat!(set, s3)
-    z  = Zmat[s1, block]
-    r1 = Zmat[s2, block]
-    r2 = Zmat[s3, block]
+    # pick three states, first one becomes z, next two are projected onto the line - Xcurrent -- z
+    sample = sample_without_replacement!(collect(1:M), 3)
+    z  = Zmat[sample[1], block]
+    r1 = Zmat[sample[2], block]
+    r2 = Zmat[sample[3], block]
     distanceXZ = Xcurrent[block] - z
     # project r1 and r2
     projectR1Z = dot(r1, distanceXZ)
@@ -206,9 +218,14 @@ function snooker_update(Xcurrent, current_logobj, ib, Zmat, M, logobj, blockinde
     γSnooker = 1.2 + rand() # uniform [1.2, 2.2]
     de_diffvec = zeros(length(Xproposal))
     de_diffvec[block] = γSnooker * (projectR1Z - projectR2Z) / dot(distanceXZ, distanceXZ) * distanceXZ
+    Xproposal += de_diffvec
+    distanceXProposalZ = Xproposal[block] - z
 
-
-
-    distanceXZ = Xcurrent .-
-
+    log_objXprop = logobj(Xproposal)
+    α = (log_objXprop - current_logobj) + 0.5 * (blocklen - 1) * (log(dot(distanceXProposalZ, distanceXProposalZ)) - log(dot(distanceXZ, distanceXZ)))
+    if log(rand()) < α
+        return Xproposal, log_objXprop
+    else
+        return Xcurrent, current_logobj
+    end
 end
